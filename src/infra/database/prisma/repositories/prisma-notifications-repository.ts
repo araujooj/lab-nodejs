@@ -1,22 +1,63 @@
 import { Injectable } from '@nestjs/common';
-import { Notification } from '../../../../application/entities/notification';
-import { NotificationRepository } from '../../../../application/repositories/notifications-repository';
+import { Notification } from '@application/entities/notification';
+import { NotificationRepository } from '@application/repositories/notifications-repository';
 import { PrismaService } from '../prisma.service';
+import { PrismaNotificationMapper } from '../mappers/prisma-notification-mapper';
 
 @Injectable()
 export class PrismaNotificationsRepository implements NotificationRepository {
-  constructor(private prismaService: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
+
+  public async findManyByRecipientId(
+    recipientId: string,
+  ): Promise<Notification[]> {
+    const notifications = await this.prisma.notification.findMany({
+      where: {
+        recipientId,
+      },
+    });
+
+    return notifications.map(PrismaNotificationMapper.toDomain);
+  }
+
+  public async findById(notificationId: string): Promise<Notification | null> {
+    const notification = await this.prisma.notification.findUnique({
+      where: {
+        id: notificationId,
+      },
+    });
+
+    if (!notification) return null;
+
+    return PrismaNotificationMapper.toDomain(notification);
+  }
+
+  public async countManyByRecipientId(recipientId: string): Promise<number> {
+    const count = await this.prisma.notification.count({
+      where: {
+        recipientId,
+      },
+    });
+
+    return count;
+  }
 
   public async create(notification: Notification): Promise<void> {
-    await this.prismaService.notification.create({
-      data: {
-        id: notification.id,
-        content: notification.content.value,
-        category: notification.category,
-        recipientId: notification.recipientId,
-        readAt: notification.readAt,
-        createdAt: notification.createdAt,
+    const raw = PrismaNotificationMapper.toPrisma(notification);
+
+    await this.prisma.notification.create({
+      data: raw,
+    });
+  }
+
+  public async save(notification: Notification): Promise<void> {
+    const raw = PrismaNotificationMapper.toPrisma(notification);
+
+    await this.prisma.notification.update({
+      where: {
+        id: raw.id,
       },
+      data: raw,
     });
   }
 }
